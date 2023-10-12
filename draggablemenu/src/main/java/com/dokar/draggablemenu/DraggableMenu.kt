@@ -196,6 +196,7 @@ private fun DraggableMenuContent(
                 dampingRatio = Spring.DampingRatioLowBouncy,
                 stiffness = Spring.StiffnessMediumLow,
             ),
+            label = "HoverBar",
         )
 
         val hoverHeight by remember {
@@ -295,6 +296,7 @@ private fun DraggableMenuItemWrapper(
                 stiffness = Spring.StiffnessLow,
             )
         },
+        label = "Scale",
     )
     Box(
         modifier = modifier.graphicsLayer {
