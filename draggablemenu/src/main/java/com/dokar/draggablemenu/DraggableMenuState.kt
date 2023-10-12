@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -71,7 +72,7 @@ class DraggableMenuState(
         private set
     val hoveredItemIndex: Int get() = hoveredItem.index
 
-    private var snappedItemIndex by mutableStateOf(-1)
+    private var snappedItemIndex by mutableIntStateOf(-1)
     private var snappedOffsetY = 0f
 
     internal var containerCoordinates: LayoutCoordinates? by mutableStateOf(null)

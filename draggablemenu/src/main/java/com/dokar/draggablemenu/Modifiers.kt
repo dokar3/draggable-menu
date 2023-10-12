@@ -6,8 +6,8 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.updateTransition
+import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.forEachGesture
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.indication
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -41,29 +41,29 @@ fun Modifier.draggableMenuContainer(state: DraggableMenuState): Modifier {
     return onGloballyPositioned { state.containerCoordinates = it }
         .pointerInput(state) {
             coroutineScope {
-                awaitPointerEventScope {
+                awaitEachGesture {
+                    awaitFirstDown()
                     while (isActive) {
-                        awaitFirstDown()
-                        while (true) {
-                            val event = awaitPointerEvent(pass = PointerEventPass.Initial)
-                            val change = event.changes.firstOrNull() ?: continue
-                            if (!state.isMenuShowing) {
-                                continue
-                            }
-                            if (!change.position.isSpecifiedAndValid()) {
-                                continue
-                            }
-                            val offset = state.containerCoordinates?.positionInWindow()
-                                ?.let { if (it.isSpecifiedAndValid()) it else Offset.Zero }
-                                ?: Offset.Zero
-                            val position = change.position + offset
-                            state.updatePointerPosition(position)
-                            if (state.isOutOfMenuBounds(position) ||
-                                event.changes.all { it.changedToUp() }
-                            ) {
-                                state.hideMenu()
-                            }
+                        val event = awaitPointerEvent(pass = PointerEventPass.Initial)
+                        val change = event.changes.firstOrNull() ?: continue
+                        if (!state.isMenuShowing) {
+                            continue
                         }
+                        if (!change.position.isSpecifiedAndValid()) {
+                            continue
+                        }
+                        val offset = state.containerCoordinates?.positionInWindow()
+                            ?.let { if (it.isSpecifiedAndValid()) it else Offset.Zero }
+                            ?: Offset.Zero
+                        val position = change.position + offset
+                        state.updatePointerPosition(position)
+                        if (state.isOutOfMenuBounds(position) ||
+                            event.changes.all { it.changedToUp() }
+                        ) {
+                            state.hideMenu()
+                        }
+                        // Consume all changes
+                        event.changes.forEach { it.consume() }
                     }
                 }
             }
@@ -170,61 +170,59 @@ internal fun Modifier.handleMenuTapAndDragGestures(state: DraggableMenuState): M
         return false
     }
 
-    return pointerInput(state) {
+    return this.pointerInput(state) {
         coroutineScope {
-            forEachGesture {
-                awaitPointerEventScope {
-                    val down = awaitFirstDown()
+            awaitEachGesture {
+                val down = awaitFirstDown()
 
-                    val downItem = state.calcHoveredItemUsingPosInMenu(down.position)
-                    val press = PressInteraction.Press(down.position)
-                    val interactionSource = state.getItemInteractionSource(downItem.index)
-                    if (interactionSource != null) {
-                        launch { interactionSource.emit(press) }
+                val downItem = state.calcHoveredItemUsingPosInMenu(down.position)
+                val press = PressInteraction.Press(down.position)
+                val interactionSource = state.getItemInteractionSource(downItem.index)
+                if (interactionSource != null) {
+                    launch { interactionSource.emit(press) }
+                }
+
+                var isTap = false
+                var change: PointerInputChange? = null
+
+                try {
+                    change = withTimeout(
+                        timeMillis = viewConfiguration.longPressTimeoutMillis
+                    ) {
+                        waitForUpOrCancellation()
+                    }
+                    // Tap
+                    val pos = change?.position ?: down.position
+                    val item = state.calcHoveredItemUsingPosInMenu(pos)
+                    if (!item.isNone()) {
+                        state.hideMenu(hoveredItemIndex = item.index)
+                    }
+                    isTap = true
+                } catch (_: PointerEventTimeoutCancellationException) {
+                    // Long pressed
+                    val pos = change?.position ?: down.position
+                    onPointerPositionChanged(pos)
+                }
+
+                if (interactionSource != null) {
+                    launch { interactionSource.emit(PressInteraction.Release(press)) }
+                }
+
+                if (isTap) {
+                    return@awaitEachGesture
+                }
+
+                while (isActive) {
+                    val event = awaitPointerEvent(pass = PointerEventPass.Main)
+
+                    if (event.changes.all { it.changedToUp() }) {
+                        // Up
+                        state.hideMenu()
+                        break
                     }
 
-                    var isTap = false
-                    var change: PointerInputChange? = null
-
-                    try {
-                        change = withTimeout(
-                            timeMillis = viewConfiguration.longPressTimeoutMillis
-                        ) {
-                            waitForUpOrCancellation()
-                        }
-                        // Tap
-                        val pos = change?.position ?: down.position
-                        val item = state.calcHoveredItemUsingPosInMenu(pos)
-                        if (!item.isNone()) {
-                            state.hideMenu(hoveredItemIndex = item.index)
-                        }
-                        isTap = true
-                    } catch (_: PointerEventTimeoutCancellationException) {
-                        // Long pressed
-                        val pos = change?.position ?: down.position
-                        onPointerPositionChanged(pos)
-                    }
-
-                    if (interactionSource != null) {
-                        launch { interactionSource.emit(PressInteraction.Release(press)) }
-                    }
-
-                    if (isTap) {
-                        return@awaitPointerEventScope
-                    }
-
-                    while (isActive) {
-                        val event = awaitPointerEvent(pass = PointerEventPass.Main)
-
-                        if (event.changes.all { it.changedToUp() }) {
-                            // Up
-                            state.hideMenu()
-                            break
-                        }
-
-                        if (onPointerPositionChanged(event.changes.first().position)) {
-                            break
-                        }
+                    if (onPointerPositionChanged(event.changes.first().position)) {
+                        break
                     }
                 }
             }

@@ -26,7 +26,10 @@ internal class ScaleIndication(
     override fun rememberUpdatedInstance(interactionSource: InteractionSource): IndicationInstance {
         val isPressed by interactionSource.collectIsPressedAsState()
 
-        val scale = animateFloatAsState(targetValue = if (isPressed) pressedScale else 1f)
+        val scale = animateFloatAsState(
+            targetValue = if (isPressed) pressedScale else 1f,
+            label = "Scale",
+        )
 
         return remember(scale) {
             ScaleIndicationInstance { scale.value }
