@@ -113,7 +113,7 @@ fun DraggableMenu(
         Popup(
             alignment = alignment,
             offset = popupOffset,
-            onDismissRequest = {},
+            onDismissRequest = { state.hideMenu() },
             properties = properties,
         ) {
             val view = LocalView.current
