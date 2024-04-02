@@ -7,6 +7,6 @@ plugins {
 }
 
 ext {
-    compiler_compiler = "1.5.8"
+    compiler_compiler = "1.5.11"
     compose_bom = "2024.03.00"
 }
